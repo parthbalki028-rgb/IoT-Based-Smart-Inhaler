@@ -1,0 +1,1396 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ELECTROX | Advanced Smart Inhaler Telemetry</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;600;700&family=Fira+Code:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --color-bg: #030508;
+            --color-surface: #0a0f18;
+            --color-surface-glass: rgba(10, 15, 24, 0.6);
+            --color-primary: #00f3ff;
+            --color-primary-glow: rgba(0, 243, 255, 0.4);
+            --color-secondary: #0066ff;
+            --color-accent: #ff0055;
+            --color-success: #00ff66;
+            --color-warning: #ffcc00;
+            --color-danger: #ff2d55;
+            --color-text: #e0e6ed;
+            --color-text-muted: #6b7c93;
+            --font-display: 'Orbitron', sans-serif;
+            --font-ui: 'Rajdhani', sans-serif;
+            --font-mono: 'Fira Code', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: var(--font-ui);
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            overflow-x: hidden;
+            line-height: 1.6;
+            transition: background-color 0.5s ease;
+        }
+
+        /* EMERGENCY MODE */
+        body.emergency-mode {
+            background-color: #1a0000;
+            animation: emergency-bg 0.5s infinite alternate;
+        }
+        body.emergency-mode nav, body.emergency-mode .hud-container {
+            border-color: var(--color-danger) !important;
+            box-shadow: 0 0 50px var(--color-danger) !important;
+        }
+
+        @keyframes emergency-bg {
+            from { background-color: #1a0000; }
+            to { background-color: #330000; }
+        }
+
+        #emergency-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(255, 0, 0, 0.15);
+            z-index: 500;
+            pointer-events: none;
+            animation: flash 0.4s infinite alternate;
+        }
+        body.emergency-mode #emergency-overlay { display: block; }
+        @keyframes flash {
+            from { opacity: 0.2; }
+            to { opacity: 0.7; }
+        }
+
+        #emergency-banner {
+            display: none;
+            position: fixed;
+            top: 80px; left: 50%;
+            transform: translateX(-50%);
+            background: var(--color-danger);
+            color: white;
+            padding: 20px 40px;
+            font-family: var(--font-display);
+            font-weight: 900;
+            font-size: 1.5rem;
+            letter-spacing: 3px;
+            z-index: 999;
+            border-radius: 10px;
+            box-shadow: 0 0 30px var(--color-danger);
+            animation: pulse-danger 1s infinite;
+        }
+        body.emergency-mode #emergency-banner { display: block; }
+        @keyframes pulse-danger {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.05); }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--color-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--color-primary); border-radius: 4px; }
+        ::selection { background: var(--color-primary); color: #000; }
+
+        .bg-grid {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: -1;
+            pointer-events: none;
+        }
+        #particle-canvas { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+
+        /* JARVIS VOICE INDICATOR */
+        #jarvis-indicator {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: var(--color-surface);
+            border: 2px solid var(--color-primary);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 999;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--color-primary-glow);
+            transition: all 0.3s;
+        }
+        #jarvis-indicator:hover { transform: scale(1.1); }
+        #jarvis-indicator i { color: var(--color-primary); font-size: 1.5rem; }
+        #jarvis-indicator.speaking {
+            animation: jarvis-pulse 0.5s infinite alternate;
+        }
+        @keyframes jarvis-pulse {
+            from { box-shadow: 0 0 20px var(--color-primary); }
+            to { box-shadow: 0 0 40px var(--color-primary), 0 0 60px var(--color-primary); }
+        }
+
+        /* BOOT */
+        #boot-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 5vw;
+            font-family: var(--font-mono);
+            color: var(--color-primary);
+            transition: opacity 1s ease-out;
+        }
+        .boot-log { font-size: 1.2rem; margin-bottom: 10px; text-shadow: 0 0 5px var(--color-primary); }
+        .cursor-blink { animation: blink 1s infinite; }
+
+        /* NAV */
+        nav {
+            position: fixed;
+            top: 0; width: 100%;
+            padding: 20px 50px;
+            background: rgba(3, 5, 8, 0.8);
+            backdrop-filter: blur(15px);
+            border-bottom: 1px solid rgba(0, 243, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        .logo {
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 900;
+            color: #fff;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px var(--color-primary-glow);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .logo i { color: var(--color-primary); }
+        .nav-links { display: flex; gap: 40px; list-style: none; }
+        .nav-links a {
+            color: var(--color-text);
+            text-decoration: none;
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            position: relative;
+            padding: 5px 0;
+            transition: color 0.3s;
+        }
+        .nav-links a:hover { color: var(--color-primary); }
+        .nav-links a::before {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; width: 0; height: 2px;
+            background: var(--color-primary);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--color-primary);
+        }
+        .nav-links a:hover::before { width: 100%; }
+
+        section {
+            min-height: 100vh;
+            padding: 150px 5vw 100px 5vw;
+            position: relative;
+            z-index: 1;
+        }
+        .section-header { text-align: center; margin-bottom: 80px; }
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 3.5rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 5px;
+            color: #fff;
+            margin-bottom: 15px;
+            position: relative;
+            display: inline-block;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -10px; left: 50%; transform: translateX(-50%);
+            width: 100px; height: 4px;
+            background: var(--color-primary);
+            box-shadow: 0 0 15px var(--color-primary);
+        }
+        .section-subtitle {
+            font-family: var(--font-mono);
+            color: var(--color-primary);
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        /* HERO */
+        #hero { display: flex; align-items: center; justify-content: space-between; padding-top: 200px; }
+        .hero-content { flex: 1; max-width: 800px; }
+        .sys-badge {
+            display: inline-block;
+            padding: 8px 15px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--color-primary);
+            color: var(--color-primary);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: 5.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+        .hero-title .glitch { position: relative; color: #fff; display: inline-block; }
+        .hero-title .glitch::before, .hero-title .glitch::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--color-bg);
+        }
+        .hero-title .glitch::before {
+            left: 2px; text-shadow: -2px 0 var(--color-accent);
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+        .hero-title .glitch::after {
+            left: -2px; text-shadow: -2px 0 var(--color-primary);
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim 2.5s infinite linear alternate-reverse;
+        }
+        .hero-desc {
+            font-size: 1.4rem;
+            color: var(--color-text-muted);
+            margin-bottom: 40px;
+            max-width: 600px;
+        }
+        .hero-visual { flex: 1; display: flex; justify-content: center; position: relative; }
+        .hero-visual::before {
+            content: '';
+            position: absolute;
+            width: 600px; height: 600px;
+            background: radial-gradient(circle, var(--color-primary-glow) 0%, transparent 60%);
+            z-index: -1;
+            animation: pulse 4s infinite alternate;
+        }
+        .hero-img {
+            width: 100%;
+            max-width: 600px;
+            border-radius: 20px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* HARDWARE */
+        .hardware-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 50px; }
+        .hw-card {
+            background: var(--color-surface-glass);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            padding: 40px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            transform-style: preserve-3d;
+            transform: perspective(1000px);
+            transition: border-color 0.3s;
+        }
+        .hw-card:hover { border-color: var(--color-primary); }
+        .hw-card-inner { transform: translateZ(30px); }
+        .hw-title {
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            color: var(--color-primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .blueprint-container {
+            width: 100%;
+            height: 380px;
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            border: 2px solid var(--color-primary);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+        }
+        .blueprint-container img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            padding: 10px;
+            display: block;
+        }
+        .blueprint-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(0, 243, 255, 0.05) 50%, transparent 50%);
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        /* FLOW */
+        .flow-wrapper { display: flex; justify-content: space-between; align-items: center; position: relative; padding: 50px 0; }
+        .flow-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 50%; left: 0; width: 100%; height: 2px;
+            background: rgba(0, 243, 255, 0.2);
+            z-index: -1;
+        }
+        .flow-node {
+            background: var(--color-surface);
+            border: 2px solid var(--color-primary);
+            width: 250px;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            position: relative;
+        }
+        .flow-node i { font-size: 3rem; color: var(--color-primary); margin-bottom: 15px; }
+        .flow-node h3 { font-family: var(--font-display); font-size: 1.2rem; margin-bottom: 10px; }
+        .flow-node p { font-size: 0.9rem; color: var(--color-text-muted); }
+
+        /* HUD */
+        .hud-container {
+            background: var(--color-surface);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 0 30px rgba(0, 243, 255, 0.1);
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .hud-container::after {
+            content: '';
+            position: absolute;
+            top: -100%; left: 0; width: 100%; height: 20%;
+            background: linear-gradient(to bottom, transparent, rgba(0, 243, 255, 0.2), transparent);
+            animation: scanline 6s linear infinite;
+            pointer-events: none;
+        }
+        .hud-controls {
+            display: flex; flex-direction: column; gap: 20px;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding-right: 30px;
+        }
+        .btn-cyber {
+            background: transparent;
+            color: var(--color-primary);
+            border: 2px solid var(--color-primary);
+            padding: 15px 20px;
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s;
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+        }
+        .btn-cyber:hover {
+            background: var(--color-primary);
+            color: #000;
+            box-shadow: 0 0 20px var(--color-primary);
+        }
+        .status-box {
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            color: var(--color-accent);
+        }
+        .dot {
+            width: 12px; height: 12px;
+            background: var(--color-accent);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--color-accent);
+        }
+
+        .hud-center { display: flex; flex-direction: column; gap: 30px; align-items: center; }
+        .stats-row { display: flex; gap: 30px; width: 100%; }
+        .stat-card {
+            flex: 1;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            padding: 20px;
+            text-align: center;
+            border-top: 3px solid var(--color-primary);
+        }
+        .stat-value {
+            font-family: var(--font-display);
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 15px rgba(255,255,255,0.3);
+        }
+        .stat-label {
+            font-family: var(--font-mono);
+            color: var(--color-primary);
+            font-size: 1rem;
+        }
+
+        .oled-bezel {
+            background: #111;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #222;
+            box-shadow: 0 10px 30px #000, inset 0 0 15px #000;
+        }
+        .oled-screen {
+            width: 256px; height: 128px;
+            background: #000;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--color-primary);
+            font-family: var(--font-mono);
+            text-shadow: 0 0 8px var(--color-primary);
+            position: relative;
+            overflow: hidden;
+        }
+        .oled-screen::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15), rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px);
+            pointer-events: none;
+        }
+
+        .hud-right {
+            display: flex; flex-direction: column; gap: 20px;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            padding-left: 30px;
+        }
+        .terminal-window {
+            background: #000;
+            border: 1px solid #333;
+            height: 200px;
+            padding: 15px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--color-success);
+            overflow-y: auto;
+            border-radius: 5px;
+        }
+        .terminal-window p { margin-bottom: 5px; }
+        .chart-container {
+            background: #000;
+            border: 1px solid #333;
+            height: 150px;
+            border-radius: 5px;
+            position: relative;
+            padding: 10px;
+        }
+        canvas#fsrChart { width: 100%; height: 100%; }
+
+        /* TEAM CARDS */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 30px;
+            margin-top: 50px;
+        }
+        .team-card {
+            background: linear-gradient(145deg, var(--color-surface), #000);
+            border: 1px solid rgba(0, 243, 255, 0.2);
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s;
+            cursor: pointer;
+        }
+        .team-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.1), transparent);
+            transition: left 0.6s;
+        }
+        .team-card:hover::before { left: 100%; }
+        .team-card:hover {
+            border-color: var(--color-primary);
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 243, 255, 0.2);
+        }
+        .team-avatar {
+            width: 100px; height: 100px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: #000;
+            box-shadow: 0 0 30px var(--color-primary-glow);
+            position: relative;
+        }
+        .team-avatar::after {
+            content: '';
+            position: absolute;
+            top: -5px; left: -5px;
+            width: calc(100% + 10px);
+            height: calc(100% + 10px);
+            border: 2px dashed var(--color-primary);
+            border-radius: 50%;
+            animation: rotate 10s linear infinite;
+        }
+        .team-name {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 5px;
+            letter-spacing: 2px;
+        }
+        .team-role {
+            font-family: var(--font-mono);
+            color: var(--color-primary);
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        .team-id {
+            font-family: var(--font-mono);
+            color: var(--color-text-muted);
+            font-size: 0.75rem;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .team-status {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--color-success);
+            font-family: var(--font-mono);
+        }
+        .team-status .pulse-dot {
+            width: 8px; height: 8px;
+            background: var(--color-success);
+            border-radius: 50%;
+            animation: pulse-small 1.5s infinite;
+            box-shadow: 0 0 10px var(--color-success);
+        }
+
+        /* SDG */
+        .sdg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 60px; }
+        .sdg-card {
+            background: var(--color-surface);
+            padding: 50px 30px;
+            text-align: center;
+            border-radius: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.4s, box-shadow 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+        .sdg-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 4px; }
+        .sdg-card:nth-child(1)::before { background: #4ade80; }
+        .sdg-card:nth-child(2)::before { background: #f97316; }
+        .sdg-card:nth-child(3)::before { background: #facc15; }
+        .sdg-card:hover { transform: translateY(-15px); box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        .sdg-card i { font-size: 4rem; margin-bottom: 20px; }
+        .sdg-card:nth-child(1) i { color: #4ade80; }
+        .sdg-card:nth-child(2) i { color: #f97316; }
+        .sdg-card:nth-child(3) i { color: #facc15; }
+
+        footer {
+            background: #010204;
+            padding: 50px;
+            text-align: center;
+            border-top: 1px solid rgba(0, 243, 255, 0.1);
+            font-family: var(--font-mono);
+            color: var(--color-text-muted);
+        }
+
+        /* ANIMATIONS */
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+        @keyframes pulse { 0% { opacity: 0.4; transform: scale(0.9); } 100% { opacity: 0.8; transform: scale(1.1); } }
+        @keyframes pulse-small { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes scanline { 0% { top: -100%; } 100% { top: 200%; } }
+        @keyframes glitch-anim {
+            0% { clip: rect(10px, 9999px, 86px, 0); }
+            20% { clip: rect(48px, 9999px, 14px, 0); }
+            40% { clip: rect(98px, 9999px, 50px, 0); }
+            60% { clip: rect(12px, 9999px, 89px, 0); }
+            80% { clip: rect(76px, 9999px, 23px, 0); }
+            100% { clip: rect(34px, 9999px, 67px, 0); }
+        }
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); }
+            20% { clip: rect(12px, 9999px, 45px, 0); }
+            40% { clip: rect(89px, 9999px, 23px, 0); }
+            60% { clip: rect(45px, 9999px, 78px, 0); }
+            80% { clip: rect(23px, 9999px, 56px, 0); }
+            100% { clip: rect(90px, 9999px, 12px, 0); }
+        }
+
+        .reveal { opacity: 0; transform: translateY(50px); transition: all 1s cubic-bezier(0.16, 1, 0.3, 1); }
+        .reveal.active { opacity: 1; transform: translateY(0); }
+
+        @media (max-width: 1200px) {
+            .hud-container { grid-template-columns: 1fr; }
+            .hud-controls, .hud-right { border: none; border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0; padding-bottom: 30px; }
+            .hud-right { border-left: none; padding-top: 30px; }
+            .team-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 900px) {
+            #hero { flex-direction: column; text-align: center; }
+            .flow-wrapper { flex-direction: column; gap: 40px; }
+            .flow-wrapper::before { display: none; }
+            .sdg-grid, .team-grid { grid-template-columns: 1fr; }
+            .hero-title { font-size: 3.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Emergency Elements -->
+    <div id="emergency-overlay"></div>
+    <div id="emergency-banner">⚠️ CRITICAL ALERT: POTENTIAL OVERDOSE DETECTED ⚠️</div>
+
+    <!-- JARVIS Voice Indicator -->
+    <div id="jarvis-indicator" title="JARVIS Voice Assistant - Click to toggle">
+        <i class="fas fa-microphone"></i>
+    </div>
+
+    <!-- BOOT -->
+    <div id="boot-screen">
+        <div id="boot-text"></div>
+        <div class="cursor-blink" style="width: 15px; height: 25px; background: var(--color-primary); margin-top: 10px;"></div>
+    </div>
+
+    <div class="bg-grid"></div>
+    <canvas id="particle-canvas"></canvas>
+
+    <nav id="navbar">
+        <div class="logo"><i class="fas fa-lungs"></i> ELECTROX</div>
+        <ul class="nav-links">
+            <li><a href="#hero">System</a></li>
+            <li><a href="#hardware">Architecture</a></li>
+            <li><a href="#flow">Pipeline</a></li>
+            <li><a href="#dashboard">Command HUD</a></li>
+            <li><a href="#team">Division</a></li>
+            <li><a href="#mission">Mission</a></li>
+        </ul>
+    </nav>
+
+    <!-- HERO -->
+    <section id="hero">
+        <div class="hero-content reveal">
+            <div class="sys-badge">OS VERSION 1.0.4 | CEP PROJECT</div>
+            <h1 class="hero-title">
+                <span class="glitch" data-text="SMART">SMART</span><br>
+                INHALER<br>
+                <span style="color: var(--color-primary);">TELEMETRY</span>
+            </h1>
+            <p class="hero-desc">Advanced respiratory monitoring interface. Utilizing Force-Sensing Resistor (FSR) matrices and Web Serial APIs to deliver zero-latency medical data directly to the browser.</p>
+            <div style="font-family: var(--font-mono); color: var(--color-primary); margin-top: 20px;">
+                > TEAM_MEMBERS: ["PARTH", "DARSH", "NIKHIL", "TANIYA"]
+            </div>
+        </div>
+        <div class="hero-visual reveal">
+            <img src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&q=80&w=800" alt="Inhaler Device" class="hero-img">
+        </div>
+    </section>
+
+    <!-- HARDWARE -->
+    <section id="hardware">
+        <div class="section-header reveal">
+            <h2 class="section-title">Architecture</h2>
+            <p class="section-subtitle">Core Hardware & Engineering Schematics</p>
+        </div>
+        <div class="hardware-grid">
+            <div class="hw-card reveal tilt-card">
+                <div class="hw-card-inner">
+                    <h3 class="hw-title"><i class="fas fa-microchip"></i> System Schematic</h3>
+                    <p style="color: var(--color-text-muted); margin-bottom: 20px;">ESP32 Core routing to FSR analog inputs, SSD1306 OLED I2C lines, and Active Buzzer PWM.</p>
+                    <div class="blueprint-container">
+                        <img src="schematic.png" alt="Circuit Schematic" onerror="this.onerror=null; this.src='https://i.postimg.cc/tTW2v6QG/temp-Image0u-OKl.jpg';">
+                        <div class="blueprint-overlay"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="hw-card reveal tilt-card">
+                <div class="hw-card-inner">
+                    <h3 class="hw-title"><i class="fas fa-layer-group"></i> PCB Layout</h3>
+                    <p style="color: var(--color-text-muted); margin-bottom: 20px;">KiCad generated double-sided printed circuit board layout minimizing trace impedance.</p>
+                    <div class="blueprint-container">
+                        <img src="pcb.png" alt="PCB Layout" onerror="this.onerror=null; this.src='https://i.postimg.cc/RhdJ37bZ/temp-Imagez2g2q-D.jpg';">
+                        <div class="blueprint-overlay"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FLOW -->
+    <section id="flow">
+        <div class="section-header reveal">
+            <h2 class="section-title">Data Pipeline</h2>
+            <p class="section-subtitle">Real-Time Actuation to Telemetry Processing</p>
+        </div>
+        <div class="flow-wrapper reveal">
+            <div class="flow-node">
+                <i class="fas fa-compress-alt"></i>
+                <h3>1. Actuation</h3>
+                <p>Mechanical force applied to canister. FSR resistance drops.</p>
+            </div>
+            <div class="flow-node">
+                <i class="fas fa-cogs"></i>
+                <h3>2. ADC Processing</h3>
+                <p>ESP32 converts analog voltage to digital threshold value.</p>
+            </div>
+            <div class="flow-node">
+                <i class="fas fa-satellite-dish"></i>
+                <h3>3. Transmission</h3>
+                <p>Local OLED update & JSON payload sent via Serial TX/RX.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- HUD -->
+    <section id="dashboard">
+        <div class="section-header reveal">
+            <h2 class="section-title">Command HUD</h2>
+            <p class="section-subtitle">Live Serial Interface & Diagnostics</p>
+        </div>
+
+        <div class="hud-container reveal" id="hudContainer">
+            <div class="hud-controls">
+                <button class="btn-cyber sfx-btn" id="connectBtn">
+                    <i class="fab fa-usb"></i> Initialize COM Port
+                </button>
+                <div class="status-box">
+                    <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 10px;">SYSTEM STATUS</div>
+                    <div class="status-indicator" id="statusIndicator">
+                        <div class="dot" id="statusDot"></div>
+                        <span id="statusText">OFFLINE</span>
+                    </div>
+                </div>
+                <div class="status-box">
+                    <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 10px;">BAUD RATE</div>
+                    <div style="font-family: var(--font-display); font-size: 1.5rem; color: #fff;">115200 bps</div>
+                </div>
+                <div class="status-box" style="border-color: var(--color-warning);">
+                    <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--color-text-muted); margin-bottom: 10px;">SAFETY LIMIT</div>
+                    <div style="font-family: var(--font-display); font-size: 1rem; color: var(--color-warning);">MAX 3 PUFFS / 10s</div>
+                </div>
+            </div>
+
+            <div class="hud-center">
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label">TOTAL PUFFS</div>
+                        <div class="stat-value" id="puffCount">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">RAW FSR FORCE</div>
+                        <div class="stat-value" id="fsrValue">--</div>
+                    </div>
+                </div>
+                <div class="oled-bezel">
+                    <div class="oled-screen" id="virtual-oled">
+                        <div style="font-size: 1.1rem; border-bottom: 1px dashed var(--color-primary); padding-bottom: 5px; margin-bottom: 10px; width: 90%; text-align: center;">ELECTROX OS</div>
+                        <div style="font-size: 1rem; margin-bottom: 10px;">LINK: NONE</div>
+                        <div style="font-size: 1.5rem;">WAITING...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="hud-right">
+                <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--color-text-muted);">SERIAL TERMINAL</div>
+                <div class="terminal-window" id="terminal">
+                    <p>> System initialized.</p>
+                    <p>> JARVIS voice assistant online.</p>
+                    <p>> Awaiting COM port selection...</p>
+                </div>
+                <div style="font-family: var(--font-mono); font-size: 0.9rem; color: var(--color-text-muted); margin-top: 10px;">FSR TELEMETRY GRAPH</div>
+                <div class="chart-container">
+                    <canvas id="fsrChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- TEAM DIVISION -->
+    <section id="team">
+        <div class="section-header reveal">
+            <h2 class="section-title">Engineering Division</h2>
+            <p class="section-subtitle">Team ELECTROX | Clearance Level: Alpha</p>
+        </div>
+        <div class="team-grid">
+            <div class="team-card reveal sfx-hover">
+                <div class="team-avatar">P</div>
+                <div class="team-name">PARTH</div>
+                <div class="team-role">// HARDWARE LEAD</div>
+                <div class="team-id">ID: ELX-001</div>
+                <div class="team-status"><div class="pulse-dot"></div> ACTIVE</div>
+            </div>
+            <div class="team-card reveal sfx-hover">
+                <div class="team-avatar">D</div>
+                <div class="team-name">DARSH</div>
+                <div class="team-role">// EMBEDDED SYSTEMS</div>
+                <div class="team-id">ID: ELX-002</div>
+                <div class="team-status"><div class="pulse-dot"></div> ACTIVE</div>
+            </div>
+            <div class="team-card reveal sfx-hover">
+                <div class="team-avatar">N</div>
+                <div class="team-name">NIKHIL</div>
+                <div class="team-role">// UI/UX ENGINEER</div>
+                <div class="team-id">ID: ELX-003</div>
+                <div class="team-status"><div class="pulse-dot"></div> ACTIVE</div>
+            </div>
+            <div class="team-card reveal sfx-hover">
+                <div class="team-avatar">T</div>
+                <div class="team-name">TANIYA</div>
+                <div class="team-role">// RESEARCH & DOCS</div>
+                <div class="team-id">ID: ELX-004</div>
+                <div class="team-status"><div class="pulse-dot"></div> ACTIVE</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MISSION -->
+    <section id="mission">
+        <div class="section-header reveal">
+            <h2 class="section-title">Global Impact</h2>
+            <p class="section-subtitle">United Nations Sustainable Development Goals</p>
+        </div>
+        <div style="text-align: center; max-width: 900px; margin: 0 auto; font-size: 1.2rem; color: var(--color-text-muted);" class="reveal">
+            Our objective is to engineer a low-cost, retrofittable IoT module that eradicates asthma fatalities caused by poor medication adherence.
+        </div>
+        <div class="sdg-grid reveal">
+            <div class="sdg-card sfx-hover">
+                <i class="fas fa-heartbeat"></i>
+                <h3 style="font-family: var(--font-display); font-size: 1.8rem; margin-bottom: 15px;">SDG 3</h3>
+                <p style="color: var(--color-text-muted);">Good Health & Well-Being via proactive emergency prevention.</p>
+            </div>
+            <div class="sdg-card sfx-hover">
+                <i class="fas fa-industry"></i>
+                <h3 style="font-family: var(--font-display); font-size: 1.8rem; margin-bottom: 15px;">SDG 9</h3>
+                <p style="color: var(--color-text-muted);">Industry & Innovation by democratizing medical IoT tech.</p>
+            </div>
+            <div class="sdg-card sfx-hover">
+                <i class="fas fa-city"></i>
+                <h3 style="font-family: var(--font-display); font-size: 1.8rem; margin-bottom: 15px;">SDG 11</h3>
+                <p style="color: var(--color-text-muted);">Sustainable Communities through connected healthcare nets.</p>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <p>ENGINEERED BY TEAM ELECTROX &copy; 2024. ALL SYSTEMS NOMINAL.</p>
+    </footer>
+
+    <script>
+        // =============================================================
+        // 1. CYBER SFX ENGINE (Web Audio API - No external files!)
+        // =============================================================
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        function playSFX(type) {
+            initAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            switch(type) {
+                case 'click':
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+                    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                    break;
+                case 'hover':
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.03, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+                    break;
+                case 'beep':
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+                    break;
+                case 'connect':
+                    [523, 659, 784].forEach((freq, i) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.connect(g); g.connect(audioCtx.destination);
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(freq, audioCtx.currentTime + i*0.1);
+                        g.gain.setValueAtTime(0.15, audioCtx.currentTime + i*0.1);
+                        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i*0.1 + 0.2);
+                        o.start(audioCtx.currentTime + i*0.1);
+                        o.stop(audioCtx.currentTime + i*0.1 + 0.2);
+                    });
+                    break;
+                case 'siren':
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(900, audioCtx.currentTime + 0.3);
+                    osc.frequency.linearRampToValueAtTime(400, audioCtx.currentTime + 0.6);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.6);
+                    break;
+            }
+        }
+
+        // =============================================================
+        // 2. JARVIS VOICE ASSISTANT (Web Speech API)
+        // =============================================================
+        let voiceEnabled = true;
+        const jarvisIndicator = document.getElementById('jarvis-indicator');
+        
+        jarvisIndicator.addEventListener('click', () => {
+            voiceEnabled = !voiceEnabled;
+            playSFX('click');
+            jarvisIndicator.querySelector('i').className = voiceEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash';
+            if(voiceEnabled) jarvis("Voice assistant activated.");
+        });
+
+        function jarvis(text) {
+            if (!voiceEnabled || !('speechSynthesis' in window)) return;
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 0.8;
+            utterance.volume = 0.9;
+            // Try to pick a male/robotic voice
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v => v.name.includes('Google UK English Male') || v.name.includes('Microsoft David') || v.name.includes('Male'));
+            if (preferredVoice) utterance.voice = preferredVoice;
+            
+            jarvisIndicator.classList.add('speaking');
+            utterance.onend = () => jarvisIndicator.classList.remove('speaking');
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // Load voices
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+        }
+
+        // =============================================================
+        // 3. BOOT SEQUENCE
+        // =============================================================
+        const bootLines = [
+            "Initializing kernel...",
+            "Loading core modules: [ESP32, FSR, OLED_I2C]... OK",
+            "Mounting file systems... OK",
+            "Starting Web Serial API Interface... OK",
+            "Loading J.A.R.V.I.S voice protocol... OK",
+            "Activating Emergency Safety Systems... OK",
+            "Welcome to Smart Inhaler OS v1.0.4"
+        ];
+        const bootTextEl = document.getElementById('boot-text');
+        const bootScreen = document.getElementById('boot-screen');
+        
+        async function runBootSequence() {
+            for (let i = 0; i < bootLines.length; i++) {
+                const p = document.createElement('div');
+                p.className = 'boot-log';
+                p.textContent = "> " + bootLines[i];
+                bootTextEl.appendChild(p);
+                playSFX('hover');
+                await new Promise(r => setTimeout(r, 300));
+            }
+            await new Promise(r => setTimeout(r, 800));
+            bootScreen.style.opacity = '0';
+            setTimeout(() => {
+                bootScreen.style.display = 'none';
+                // JARVIS greets after boot
+                setTimeout(() => jarvis("Welcome to Electrox Smart Inhaler System. All systems nominal. Awaiting your command."), 500);
+            }, 1000);
+        }
+        window.addEventListener('load', runBootSequence);
+
+        // =============================================================
+        // 4. SFX ATTACHMENT TO ELEMENTS
+        // =============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.sfx-btn, .btn-cyber').forEach(el => {
+                el.addEventListener('click', () => playSFX('click'));
+                el.addEventListener('mouseenter', () => playSFX('hover'));
+            });
+            document.querySelectorAll('.sfx-hover, .nav-links a').forEach(el => {
+                el.addEventListener('mouseenter', () => playSFX('hover'));
+            });
+        });
+
+        // =============================================================
+        // 5. PARTICLE ENGINE
+        // =============================================================
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.radius = Math.random() * 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = document.body.classList.contains('emergency-mode') 
+                    ? 'rgba(255, 45, 85, 0.5)' 
+                    : 'rgba(0, 243, 255, 0.5)';
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 100; i++) particles.push(new Particle());
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, width, height);
+            for (let i = 0; i < particles.length; i++) {
+                particles[i].update();
+                particles[i].draw();
+                for (let j = i; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 100) {
+                        ctx.beginPath();
+                        ctx.strokeStyle = document.body.classList.contains('emergency-mode')
+                            ? `rgba(255, 45, 85, ${0.2 - dist/500})`
+                            : `rgba(0, 243, 255, ${0.2 - dist/500})`;
+                        ctx.lineWidth = 0.5;
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                    }
+                }
+            }
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // =============================================================
+        // 6. 3D TILT
+        // =============================================================
+        const tiltCards = document.querySelectorAll('.tilt-card');
+        tiltCards.forEach(card => {
+            card.addEventListener('mousemove', e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const rotateX = ((y - centerY) / centerY) * -10;
+                const rotateY = ((x - centerX) / centerX) * 10;
+                card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.transform = `perspective(1000px) rotateX(0) rotateY(0)`;
+                card.style.transition = `transform 0.5s ease`;
+            });
+            card.addEventListener('mouseenter', () => { card.style.transition = `none`; });
+        });
+
+        // =============================================================
+        // 7. SCROLL REVEAL
+        // =============================================================
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) entry.target.classList.add('active');
+            });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+        // =============================================================
+        // 8. LIVE FSR CHART
+        // =============================================================
+        const chartCanvas = document.getElementById('fsrChart');
+        const chartCtx = chartCanvas.getContext('2d');
+        let chartWidth, chartHeight;
+        let fsrHistory = new Array(50).fill(0);
+
+        function resizeChart() {
+            const container = chartCanvas.parentElement;
+            chartWidth = chartCanvas.width = container.clientWidth - 20;
+            chartHeight = chartCanvas.height = container.clientHeight - 20;
+        }
+        window.addEventListener('resize', resizeChart);
+        resizeChart();
+
+        function drawChart() {
+            chartCtx.clearRect(0, 0, chartWidth, chartHeight);
+            chartCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            chartCtx.moveTo(0, chartHeight/2);
+            chartCtx.lineTo(chartWidth, chartHeight/2);
+            chartCtx.stroke();
+
+            chartCtx.beginPath();
+            const isEmergency = document.body.classList.contains('emergency-mode');
+            chartCtx.strokeStyle = isEmergency ? '#ff2d55' : '#00f3ff';
+            chartCtx.lineWidth = 2;
+            const sliceWidth = chartWidth / (fsrHistory.length - 1);
+            
+            for(let i=0; i<fsrHistory.length; i++) {
+                const x = i * sliceWidth;
+                const y = chartHeight - ((fsrHistory[i] / 4095) * chartHeight);
+                if(i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            }
+            chartCtx.stroke();
+            
+            chartCtx.lineTo(chartWidth, chartHeight);
+            chartCtx.lineTo(0, chartHeight);
+            chartCtx.closePath();
+            const gradient = chartCtx.createLinearGradient(0,0,0,chartHeight);
+            if(isEmergency) {
+                gradient.addColorStop(0, 'rgba(255, 45, 85, 0.4)');
+                gradient.addColorStop(1, 'rgba(255, 45, 85, 0)');
+            } else {
+                gradient.addColorStop(0, 'rgba(0, 243, 255, 0.4)');
+                gradient.addColorStop(1, 'rgba(0, 243, 255, 0)');
+            }
+            chartCtx.fillStyle = gradient;
+            chartCtx.fill();
+        }
+        drawChart();
+
+        // =============================================================
+        // 9. EMERGENCY PROTOCOL SYSTEM
+        // =============================================================
+        let puffTimestamps = [];
+        const EMERGENCY_THRESHOLD = 3; // puffs
+        const EMERGENCY_WINDOW = 10000; // 10 seconds
+        let emergencyActive = false;
+
+        function checkEmergency() {
+            const now = Date.now();
+            puffTimestamps = puffTimestamps.filter(t => now - t < EMERGENCY_WINDOW);
+            
+            if (puffTimestamps.length >= EMERGENCY_THRESHOLD && !emergencyActive) {
+                triggerEmergency();
+            } else if (puffTimestamps.length < EMERGENCY_THRESHOLD && emergencyActive) {
+                clearEmergency();
+            }
+        }
+
+        function triggerEmergency() {
+            emergencyActive = true;
+            document.body.classList.add('emergency-mode');
+            logTerminal("⚠️ EMERGENCY: Overdose threshold exceeded!", false);
+            playSFX('siren');
+            jarvis("Warning! Critical alert. Overdose detected. Please stop inhaler usage immediately and seek medical assistance.");
+            
+            // Repeat siren
+            const sirenInterval = setInterval(() => {
+                if(!emergencyActive) { clearInterval(sirenInterval); return; }
+                playSFX('siren');
+            }, 2000);
+        }
+
+        function clearEmergency() {
+            emergencyActive = false;
+            document.body.classList.remove('emergency-mode');
+            logTerminal("✓ Emergency cleared. Returning to normal operation.", false);
+            jarvis("Emergency cleared. System returning to nominal status.");
+        }
+
+        // =============================================================
+        // 10. WEB SERIAL API & HUD LOGIC
+        // =============================================================
+        let port, reader;
+        
+        const connectBtn = document.getElementById('connectBtn');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.getElementById('statusDot');
+        const puffEl = document.getElementById('puffCount');
+        const fsrEl = document.getElementById('fsrValue');
+        const oledEl = document.getElementById('virtual-oled');
+        const terminalEl = document.getElementById('terminal');
+        
+        let lastPuffCount = 0;
+
+        function logTerminal(msg, isData = false) {
+            const p = document.createElement('p');
+            const time = new Date().toLocaleTimeString();
+            p.textContent = `[${time}] ${msg}`;
+            p.style.color = isData ? 'var(--color-primary)' : 'var(--color-success)';
+            terminalEl.appendChild(p);
+            terminalEl.scrollTop = terminalEl.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            initAudio();
+            if ('serial' in navigator) {
+                try {
+                    port = await navigator.serial.requestPort();
+                    await port.open({ baudRate: 115200 });
+                    
+                    statusText.textContent = "ONLINE";
+                    statusText.style.color = "var(--color-success)";
+                    statusDot.style.background = "var(--color-success)";
+                    statusDot.style.boxShadow = "0 0 15px var(--color-success)";
+                    connectBtn.style.display = "none";
+                    
+                    logTerminal("COM Port Opened Successfully.");
+                    updateOLED("LINK: ACTIVE", "--");
+                    playSFX('connect');
+                    jarvis("Telemetry link established. System online. Monitoring respiratory data.");
+
+                    readLoop();
+                } catch (err) {
+                    logTerminal("ERROR: Connection failed.", false);
+                    jarvis("Connection failed. Please verify the serial port.");
+                    alert("Serial link failed. Verify COM port.");
+                }
+            } else {
+                alert('Browser does not support Web Serial API. Use Chrome/Edge.');
+                jarvis("Browser incompatibility detected. Please use Google Chrome or Microsoft Edge.");
+            }
+        });
+
+        async function readLoop() {
+            const decoder = new TextDecoderStream();
+            port.readable.pipeTo(decoder.writable);
+            reader = decoder.readable.getReader();
+            let buffer = "";
+
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) { reader.releaseLock(); break; }
+                
+                buffer += value;
+                let lines = buffer.split('\n');
+                buffer = lines.pop(); 
+
+                for (let line of lines) {
+                    line = line.trim();
+                    if(line.length > 0) logTerminal(line, true);
+
+                    if (line.startsWith('{') && line.endsWith('}')) {
+                        try {
+                            const data = JSON.parse(line);
+                            updateDashboard(data);
+                        } catch (e) { console.log("Parse Error", e); }
+                    }
+                }
+            }
+        }
+
+        function updateDashboard(data) {
+            if(data.puffs !== undefined) {
+                // Detect new puff
+                if(data.puffs > lastPuffCount) {
+                    puffTimestamps.push(Date.now());
+                    playSFX('beep');
+                    checkEmergency();
+                    if(!emergencyActive) jarvis(`Puff ${data.puffs} registered.`);
+                }
+                lastPuffCount = data.puffs;
+                puffEl.textContent = data.puffs;
+            }
+            
+            if(data.fsr !== undefined) {
+                fsrEl.textContent = data.fsr;
+                fsrHistory.shift(); 
+                fsrHistory.push(data.fsr);
+                drawChart();
+            }
+            
+            let currentStatus = "IDLE";
+            if (data.fsr > 500) currentStatus = "ACTUATING";
+            updateOLED(`STS: ${currentStatus}`, data.puffs !== undefined ? `PUFFS: ${data.puffs}` : "PUFFS: --");
+        }
+
+        function updateOLED(status, dataStr) {
+            oledEl.innerHTML = `
+                <div style="font-size: 1.1rem; border-bottom: 1px dashed var(--color-primary); padding-bottom: 5px; margin-bottom: 10px; width: 90%; text-align: center;">ELECTROX OS</div>
+                <div style="font-size: 1.2rem; margin-bottom: 10px; color: ${status.includes('ACTUATING') ? 'var(--color-accent)' : 'var(--color-primary)'}">${status}</div>
+                <div style="font-size: 1.8rem; font-weight: bold;">${dataStr}</div>
+            `;
+        }
+
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if(window.scrollY > 50) {
+                nav.style.background = 'rgba(3, 5, 8, 0.95)';
+                nav.style.padding = '15px 50px';
+            } else {
+                nav.style.background = 'rgba(3, 5, 8, 0.8)';
+                nav.style.padding = '20px 50px';
+            }
+        });
+    </script>
+</body>
+</html>
